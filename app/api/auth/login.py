@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 router = APIRouter()
 
-user_collection = database.get_collection("users")
+user_collection = database.get_collection("usersInfo")
 
 
 def hash_password(password):

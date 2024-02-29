@@ -1,7 +1,5 @@
 from fastapi import FastAPI, BackgroundTasks
 from app.api.auth import register, login
-from app.api.chat import chat
-from app.api.user import contacts
 from fastapi.middleware.cors import CORSMiddleware
 import redis
 import threading
@@ -20,7 +18,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-redis_client = redis.Redis(host="localhost", port=6379, db=0)
+# redis_client = redis.Redis(host="localhost", port=6379, db=0)
+redis_client = redis.Redis(host="redis-1", port=6379, db=0)
+
 
 listening_thread_active = True
 
@@ -47,8 +47,12 @@ async def shutdown_event():
 
 app.include_router(register.router, prefix="/auth", tags=["auth"])
 app.include_router(login.router, prefix="/auth", tags=["auth"])
-app.include_router(chat.router, prefix="/chat", tags=["chat"])
-app.include_router(contacts.router, prefix="/contacts", tags=["contacts"])
+
+
+@app.get("/")
+async def root():
+    return {"message": "Hello Cloud system drive"}
+
 
 if __name__ == "__main__":
     import uvicorn

@@ -8,7 +8,7 @@ DATABASE_URL = "mongodb://localhost:27017"
 client = AsyncIOMotorClient(DATABASE_URL)
 
 # Define the MongoDB database
-database = client.webchat
+database = client.cloud_system_drive
 
 # Optional: If you want to use a specific collection
 # Example: user_collection = database.get_collection("users")
