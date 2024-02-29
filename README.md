@@ -3,13 +3,40 @@
 
 ## `requirements`
 python 3.9 - mongodb local
+redis server
 
 ## `How to run`
-### `python -m venv lib`
-create virtual environment
-### `source lib/Scripts/activate`
-activate virtual environment
-### `pip install -r requirements.txt`
-install dependencies
-### `uvicorn main:app --reload`
-run server
+
+### `run with docker`
+
+```bash
+# build docker image 
+docker-compose up --build
+```
+
+### `run with python and redis on host machine`
+
+```bash
+
+# start redis server
+redis-server
+
+# create virtual environment
+python -m venv lib
+
+# activate virtual environment
+source lib/Scripts/activate
+
+# install dependencies
+pip install -r requirements.txt
+
+#run server
+uvicorn main:app --reload
+
+```
+
+
+
+
+## License
+[Source code create by Huy8bit](https://github.com/Huy-8bit/project_1)
