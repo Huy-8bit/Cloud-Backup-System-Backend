@@ -9,8 +9,9 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                // Checkout mã nguồn từ branch Developer
-                git branch: 'Developer', url: 'https://your-repo-url-here.git'
+                script {
+                    sh 'git checkout Development'
+                }
             }
         }
 
