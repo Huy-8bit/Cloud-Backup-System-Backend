@@ -24,20 +24,20 @@ pipeline {
             }
         }
 
-        stage('Cleanup') {
-            steps {
-                script {
-                    // Dọn dẹp sau khi deploy (tùy chọn)
-                    sh 'docker-compose down'
-                }
-            }
-        }
-    }
+    //     stage('Cleanup') {
+    //         steps {
+    //             script {
+    //                 // Dọn dẹp sau khi deploy (tùy chọn)
+    //                 sh 'docker-compose down'
+    //             }
+    //         }
+    //     }
+    // }
 
-    post {
-        always {
-            // Các bước để thực hiện sau cùng, ví dụ như gửi thông báo
-            echo 'Quy trình CI/CD đã hoàn thành.'
-        }
-    }
+    // post {
+    //     always {
+    //         // Các bước để thực hiện sau cùng, ví dụ như gửi thông báo
+    //         echo 'Quy trình CI/CD đã hoàn thành.'
+    //     }
+    // }
 }
