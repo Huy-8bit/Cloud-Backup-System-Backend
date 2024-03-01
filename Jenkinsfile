@@ -2,14 +2,18 @@ pipeline {
     agent any
     
     stages {
-        steps ('run docker-compose') {
-            sh 'docker-compose up --build'
+        stage('Build and Run') { // Corrected: Added a stage block here
+            steps {
+                sh 'docker-compose up --build'
+            }
         }
     }
 
     post {
         always {
-            Cleanup()
+            // Corrected: Ensure this is a valid step or script
+            // Cleanup() // This needs to be a valid Jenkins command or script block
+            echo 'Cleanup steps go here'
         }
     }
 }
