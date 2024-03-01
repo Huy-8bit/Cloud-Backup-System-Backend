@@ -3,23 +3,23 @@ pipeline {
 
     environment {
         // Đặt biến môi trường nếu cần
-        DOCKER_COMPOSE_VERSION = '1.29.2'
+        // DOCKER_COMPOSE_VERSION = '1.29.2'
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                script {
-                    sh 'git checkout Development'
-                }
-            }
-        }
+        // stage('Checkout') {
+        //     steps {
+        //         script {
+        //             sh 'git checkout Development'
+        //         }
+        //     }
+        // }
 
         stage('Build and Deploy') {
             steps {
                 script {
                     // Chạy docker-compose
-                    sh 'docker-compose -f docker-compose.yml up --build -d'
+                    sh 'docker-compose up --build'
                 }
             }
         }
@@ -34,10 +34,9 @@ pipeline {
     //     }
     // }
 
-    // post {
-    //     always {
-    //         // Các bước để thực hiện sau cùng, ví dụ như gửi thông báo
-    //         echo 'Quy trình CI/CD đã hoàn thành.'
-    //     }
-    // }
+    post {
+        always {
+            Cleanup()
+        }
+    }
 }
