@@ -2,8 +2,10 @@ from fastapi import FastAPI, BackgroundTasks
 from app.api.auth import register, login
 from fastapi.middleware.cors import CORSMiddleware
 import redis
+
 import threading
 from threading import Event
+from app.core.database import database
 import asyncio
 import json
 from app.core.redis_utils import get_redis_client, listen_for_messages
@@ -18,11 +20,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# redis_client = redis.Redis(host="localhost", port=6379, db=0)
-redis_client = redis.Redis(host="redis-1", port=6379, db=0)
+REDIS_URL = "redis://redis:6379"
+
+try:
+    redis_client = redis.Redis.from_url(REDIS_URL)
+except redis.ConnectionError:
+    print("Redis connection error")
+    redis_client = None
+
+print("Redis client successfully connected")
 
 
-listening_thread_active = True
+# try:
+#     redis_client = redis.Redis(host="cloud-backup-system-redis-1", port=6379, db=0)
+# except redis.ConnectionError:
+#     redis_client = None
+
+# listening_thread_active = True
 
 redis_client = get_redis_client()
 listening_thread_active = True
@@ -52,6 +66,25 @@ app.include_router(login.router, prefix="/auth", tags=["auth"])
 @app.get("/")
 async def root():
     return {"message": "Hello Cloud system drive"}
+
+
+@app.get("/health")
+async def health_check():
+
+    try:
+        await database.command("ping")
+        mongo_status = True
+    except Exception:
+        mongo_status = False
+    #
+    # check_redis = redis_client.ping()
+    # if check_redis:
+    #     redis_status = True
+    # else:
+    #     redis_status = False
+    # redis_status = True if check_redis else False
+    # return {"redis": redis_status, "mongo": mongo_status}
+    return {"mongo": mongo_status}
 
 
 if __name__ == "__main__":
