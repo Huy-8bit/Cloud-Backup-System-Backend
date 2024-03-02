@@ -5,7 +5,6 @@ WORKDIR /app
 
 
 
-
 COPY requirements.txt .
 
 RUN python -m venv lib

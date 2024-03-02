@@ -4,8 +4,17 @@ pipeline {
     stages {
         stage('Build and Run') { // Corrected: Added a stage block here
             steps {
-                sh 'docker-compose up --build'
+                sh 'docker build -t huy8bit/web:latest .'
+                // run redis container
+                sh 'docker container run -d -p 6379:6379 redis:lastest'
+                // run mongo container
+                sh 'docker container run -d -p 27017:27017 mongo:lastest'
+                // run web container
+                sh 'docker container run -d -p 8000:8000 huy8bit/web:latest'
             }
+            // steps {
+            //     sh 'sudo docker-compose up --build'
+            // }
         }
     }
 
