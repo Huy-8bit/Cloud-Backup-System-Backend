@@ -13,7 +13,7 @@ pipeline {
             //     sh 'docker container run -d -p 8000:8000 huy8bit/web:latest'
             // }
             steps {
-                sh 'sudo docker-compose up --build'
+                sh 'docker-compose up --build'
             }
         }
     }
