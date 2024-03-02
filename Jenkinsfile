@@ -6,9 +6,9 @@ pipeline {
             steps {
                 sh 'docker build -t huy8bit/web:latest .'
                 // run redis container
-                sh 'docker container run -d -p 6379:6379 redis:lastest'
+                sh 'docker container run -d -p 6379:6379 redis:latest'
                 // run mongo container
-                sh 'docker container run -d -p 27017:27017 mongo:lastest'
+                sh 'docker container run -d -p 27017:27017 mongo:latest'
                 // run web container
                 sh 'docker container run -d -p 8000:8000 huy8bit/web:latest'
             }
