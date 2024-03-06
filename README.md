@@ -18,8 +18,15 @@ docker-compose up --build
 
 ```bash
 
-# start redis server
-redis-server
+# start redis server with docker
+docker container run -d --name redis -p 6379:6379 redis:latest
+
+# start mongodb server with docker
+docker container run -d --name mongo -p 27017:27017 mongo:latest
+
+# create folder for data
+mkdir data
+mkdir data/key data/encrypted_files
 
 # create virtual environment
 python -m venv lib
