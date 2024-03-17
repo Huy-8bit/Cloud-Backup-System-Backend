@@ -8,4 +8,4 @@ DATABASE_URL = "mongodb://localhost:27017"
 client = AsyncIOMotorClient(DATABASE_URL)
 
 # Define the MongoDB database
-database = client["project1"]
+database = client["cloud_backup"]
