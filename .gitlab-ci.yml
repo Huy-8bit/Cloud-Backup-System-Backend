@@ -18,3 +18,5 @@ test_with_docker_compose:
   script:
     - docker-compose -f docker-compose.yml up --build -d
     - docker-compose down
+
+
