@@ -18,7 +18,7 @@ async def saveFile(save_path, data):
 
 
 async def download_file(download_code):
-    download_url = f"http://54.254.58.42:8000/drive/download-file/{download_code}"
+    download_url = f"http://54.254.58.42/drive/download-file/{download_code}"
     async with aiohttp.ClientSession() as session:
         async with session.get(download_url) as response:
             if response.status == 200:
@@ -62,7 +62,7 @@ async def connect_and_listen():
             device_id = f.read().strip()
 
     headers = {"DEVICE_ID": device_id}
-    uri = "ws://54.254.58.42:8000/drive/ws"
+    uri = "ws://54.254.58.42/drive/ws"
 
     async with websockets.connect(uri, extra_headers=headers) as websocket:
         while True:
