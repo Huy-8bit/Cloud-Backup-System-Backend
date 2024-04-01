@@ -1,4 +1,4 @@
-('/Users/huy8bit/Desktop/DRIVE/DEV/DOAN/Cloud-Backup-System/client/build/client/PYZ-00.pyz',
+('/Users/huy8bit/Desktop/DRIVE/DEV/DOAN/source/client/build/client/PYZ-00.pyz',
  [('__future__',
    '/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/__future__.py',
    'PYMODULE'),
