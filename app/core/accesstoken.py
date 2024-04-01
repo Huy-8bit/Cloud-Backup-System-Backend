@@ -9,7 +9,6 @@ secret_key = "drive_sync_secret_key"
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 600
 
-
 userData = database.get_collection("usersInfo")
 
 

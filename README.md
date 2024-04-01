@@ -29,10 +29,10 @@ mkdir data
 mkdir data/key data/encrypted_files
 
 # create virtual environment
-python -m venv lib
+python -m venv virtualenv
 
 # activate virtual environment
-source lib/Scripts/activate
+source virtualenv/bin/activate
 
 # install dependencies
 pip install -r requirements.txt
