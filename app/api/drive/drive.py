@@ -56,6 +56,15 @@ async def send_data_to_user(client_id: str, data: str):
         print(f"No active connection for client_id: {client_id}")
 
 
+async def verify_user_ownership(user: dict, device_id: str):
+    device = await device_collection.find_one({"device_id": device_id})
+    if device is None or device.get("user_id") != user.get("id"):
+        raise HTTPException(
+            status_code=403, detail="User is not the owner of the device"
+        )
+    return True
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -87,10 +96,13 @@ async def get_active_connections():
 
 
 @router.post("/send-file/{device_id}")
-async def send_file(device_id: str, file: UploadFile = File(...)):
+async def send_file(
+    device_id: str, file: UploadFile = File(...), user=Depends(get_current_active_user)
+):
     connection_info = active_connections.get(device_id)
     if not connection_info:
         raise HTTPException(status_code=404, detail="Device not connected")
+    await verify_user_ownership(user, device_id)
 
     file_content = await file.read()
     file_name = file.filename
@@ -119,13 +131,18 @@ async def send_file(device_id: str, file: UploadFile = File(...)):
 
 
 @router.get("/download-file/{file_code}")
-async def download_file(file_code: str = Path(..., title="The file code")):
+async def download_file(
+    file_code: str = Path(..., title="The file code"),
+    user=Depends(get_current_active_user),
+):
 
     file_info = await database["filesManager"].find_one(
         {"hash_name": {"$regex": f"^{file_code}"}}
     )
     if not file_info:
         raise HTTPException(status_code=404, detail="File not found")
+
+    await verify_user_ownership(user, file_info["user_id"])
 
     file_path = file_info["file_path"]
     file_name = file_info["file_name"]
