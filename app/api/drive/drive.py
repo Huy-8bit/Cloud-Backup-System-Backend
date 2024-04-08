@@ -95,6 +95,17 @@ async def get_active_connections():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/request-directory-structure/{device_id}")
+async def request_directory_structure(device_id: str):
+    connection_info = active_connections.get(device_id)
+    if not connection_info:
+        raise HTTPException(status_code=404, detail="Device not connected")
+    websocket = connection_info["websocket"]
+    await websocket.send_text(json.dumps({"action": "get_tree_structure"}))
+    data = await websocket.receive_text()
+    return {"directory_structure": json.loads(data)}
+
+
 @router.post("/send-file/{device_id}")
 async def send_file(
     device_id: str, file: UploadFile = File(...), user=Depends(get_current_active_user)
@@ -133,7 +144,6 @@ async def send_file(
 @router.get("/download-file/{file_code}")
 async def download_file(
     file_code: str = Path(..., title="The file code"),
-    user=Depends(get_current_active_user),
 ):
 
     file_info = await database["filesManager"].find_one(
@@ -141,8 +151,6 @@ async def download_file(
     )
     if not file_info:
         raise HTTPException(status_code=404, detail="File not found")
-
-    await verify_user_ownership(user, file_info["user_id"])
 
     file_path = file_info["file_path"]
     file_name = file_info["file_name"]
@@ -154,6 +162,17 @@ async def download_file(
     return FileResponse(file_path, headers=headers)
 
 
+@router.get("/request-file-from-client/{device_id}")
+async def request_file_from_client(device_id: str, file_path: str):
+    connection_info = active_connections.get(device_id)
+    if not connection_info:
+        raise HTTPException(status_code=404, detail="Device not connected")
+    websocket = connection_info["websocket"]
+    await websocket.send_text(json.dumps({"action": "get_file"}))
+    data = await websocket.receive_text()
+    return {"file_data": data}
+
+
 @router.post("/setDevice")
 async def setDevice(
     user_id: str = Depends(get_current_active_user),
@@ -163,20 +182,21 @@ async def setDevice(
         raise HTTPException(status_code=404, detail="User not found")
 
     device = await device_collection.find_one({"user_id": user_id["id"]})
+    device_id = hashlib.sha256(device_name.encode()).hexdigest()
+
     if device:
         await device_collection.update_one(
-            {"user_id": user_id}, {"$set": {"device_name": device_name}}
+            {"user_id": user_id["id"]},
+            {"$set": {"device_name": device_name, "device_id": device_id}},
         )
     else:
         await device_collection.insert_one(
-            {"user_id": user_id, "device_name": device_name}
+            {
+                "user_id": user_id["id"],
+                "device_name": device_name,
+                "device_id": device_id,
+            }
         )
-
-    device_id = hashlib.sha256(device_name.encode()).hexdigest()
-
-    await device_collection.update_one(
-        {"user_id": user_id}, {"$set": {"device_id": device_id}}
-    )
 
     return {"message": "Device set successfully", "device_id": device_id}
 
