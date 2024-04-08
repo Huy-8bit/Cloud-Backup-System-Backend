@@ -9,6 +9,9 @@ from services import directory_tree_to_json
 import re
 
 
+id = ""
+
+
 def ensure_data_directory():
     if not os.path.exists("./data"):
         os.makedirs("./data")
@@ -17,6 +20,10 @@ def ensure_data_directory():
 async def saveFile(save_path, data):
     with open(save_path, "wb") as buffer:
         buffer.write(data)
+
+
+async def get_tree_structure():
+    return directory_tree_to_json("./data")
 
 
 async def read_file_content(file_path):
@@ -60,30 +67,42 @@ async def download_file(download_code):
 
 
 async def handle_file(websocket):
-    message = await websocket.recv()
-    message = json.loads(message)
-    if "download_code" in message:
-        await download_file(message["download_code"])
-    else:
-        print(f"Received message: {message}")
-        await handle_request(websocket, message)
+    try:
+        message = await websocket.recv()
+        print(f"Raw message received: {message}")
+        if message:
+            try:
+                data = json.loads(message)
+                if "download_code" in data:
+                    await download_file(data["download_code"])
+                else:
+                    print(f"Received message: {data}")
+                    await handle_request(websocket, data["action"])
+            except json.JSONDecodeError as e:
+                print(
+                    f"JSONDecodeError occurred while decoding message: {message}, error: {e}"
+                )
+        else:
+            print("Received an empty message or non-JSON message.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
 
 
-async def handle_request(websocket, message):
-    if message["action"] == "get_tree_structure":
-        print("Getting tree structure")
-        tree_structure = await get_tree_structure()
-        print(tree_structure)
-        await websocket.send(json.dumps(tree_structure))
-        print("Tree structure sent")
-    elif message["action"] == "get_file":
-        file_path = message["file_path"]
-        file_content = await read_file_content(file_path)
-        await websocket.send(file_content)
-
-
-async def get_tree_structure():
-    return directory_tree_to_json("./data")
+async def handle_request(websocket, action):
+    if action == "get_tree_structure":
+        print("Sending directory structure")
+        tree_structure = directory_tree_to_json("./data")
+        try:
+            response = {
+                "DEVICE_ID": id,
+                "action": "send_tree_structure",
+                "data": tree_structure,
+            }
+            response = json.dumps(response)
+            await websocket.send(response)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+        print("Directory structure sent")
 
 
 async def connect_and_listen():
@@ -97,6 +116,8 @@ async def connect_and_listen():
     else:
         with open(id_file_path, "r") as f:
             device_id = f.read().strip()
+
+    id = device_id
 
     headers = {"DEVICE_ID": device_id}
     uri = "ws://localhost:8000/drive/ws"

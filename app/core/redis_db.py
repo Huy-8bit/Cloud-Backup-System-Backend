@@ -2,15 +2,11 @@ import redis
 import json
 
 
-def get_redis_client():
-    return redis.Redis(host="13.229.133.71", port=6379, db=0)
+async def get_redis_client():
+    return redis.Redis(host="localhost", port=6379, db=0)
 
 
-# def get_redis_client():
-#     return redis.Redis(host="localhost", port=6379, db=0)
-
-
-def listen_for_messages(client, stop_event):
+async def listen_for_messages(client, stop_event):
     pubsub = client.pubsub()
     pubsub.subscribe("chatMessages")
 
@@ -22,6 +18,13 @@ def listen_for_messages(client, stop_event):
     pubsub.unsubscribe("chatMessages")
 
 
-def send_new_notification(client, title, description):
+async def get_data(client, key):
+    data = client.get(key)
+    if data:
+        return json.loads(data)
+    return None
+
+
+async def send_new_notification(client, title, description):
     json_description = json.dumps(description)
     client.publish(title, json_description)

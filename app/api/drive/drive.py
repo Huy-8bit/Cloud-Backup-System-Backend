@@ -15,7 +15,7 @@ import hashlib
 import random
 from app.core.dependencies import get_current_active_user
 from app.core.accesstoken import check_user_exit
-from app.core.database import database
+from app.core.mongo_db import database
 from bson import ObjectId
 import json
 from ...core.os_support import (
@@ -23,7 +23,7 @@ from ...core.os_support import (
     saveFile,
 )
 import datetime
-
+from app.core.redis_db import send_new_notification, get_redis_client
 
 router = APIRouter()
 
@@ -48,12 +48,12 @@ def clean_data(item, exclude_keys):
     return item
 
 
-async def send_data_to_user(client_id: str, data: str):
-    if client_id in active_connections:
-        websocket = active_connections[client_id]
+async def send_data_to_user(device_id: str, data: str):
+    websocket = active_connections.get(device_id)
+    if websocket:
         await websocket.send_text(data)
     else:
-        print(f"No active connection for client_id: {client_id}")
+        print(f"No active connection for device_id: {device_id}")
 
 
 async def verify_user_ownership(user: dict, device_id: str):
@@ -77,7 +77,14 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            await websocket.send_text(f"Message text was: {data}")
+            print(f"Message received: {data}")
+            client = await get_redis_client()
+            action = json.loads(data).get("action")
+            # remove the action key from the data
+            data = clean_data(json.loads(data), ["action"])
+            await send_new_notification(client, action, data)
+            print(f"Message received: {data}")
+
     except Exception as e:
         print(f"Error: {e}")
     finally:
@@ -95,6 +102,16 @@ async def get_active_connections():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/request-file-from-client/{device_id}")
+async def request_file_from_client(device_id: str, file_path: str):
+    connection_info = active_connections.get(device_id)
+    if not connection_info:
+        raise HTTPException(status_code=404, detail="Device not connected")
+    websocket = connection_info["websocket"]
+    await websocket.send_text(json.dumps({"action": "get_file"}))
+    return {"message": "File request initiated"}
+
+
 @router.get("/request-directory-structure/{device_id}")
 async def request_directory_structure(device_id: str):
     connection_info = active_connections.get(device_id)
@@ -102,9 +119,7 @@ async def request_directory_structure(device_id: str):
         raise HTTPException(status_code=404, detail="Device not connected")
     websocket = connection_info["websocket"]
     await websocket.send_text(json.dumps({"action": "get_tree_structure"}))
-    # data = await websocket.receive_text()
-    # return {"directory_structure": json.loads(data)}
-    return {"message": "Request sent"}
+    return {"message": "Directory structure request initiated"}
 
 
 @router.post("/send-file/{device_id}")
@@ -161,17 +176,6 @@ async def download_file(
     headers = {"Content-Disposition": f'attachment; filename="{file_name}"'}
 
     return FileResponse(file_path, headers=headers)
-
-
-@router.get("/request-file-from-client/{device_id}")
-async def request_file_from_client(device_id: str, file_path: str):
-    connection_info = active_connections.get(device_id)
-    if not connection_info:
-        raise HTTPException(status_code=404, detail="Device not connected")
-    websocket = connection_info["websocket"]
-    await websocket.send_text(json.dumps({"action": "get_file"}))
-    data = await websocket.receive_text()
-    return {"file_data": data}
 
 
 @router.post("/setDevice")

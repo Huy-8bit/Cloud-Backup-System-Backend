@@ -2,11 +2,10 @@ from fastapi import FastAPI, BackgroundTasks
 from app.api.auth import register, login
 from app.api.drive import drive
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.database import database
-import redis
+from app.core.mongo_db import database
 import threading
 from threading import Event
-from app.core.redis_utils import get_redis_client, listen_for_messages
+from app.core.redis_db import get_redis_client, listen_for_messages
 
 
 app = FastAPI()

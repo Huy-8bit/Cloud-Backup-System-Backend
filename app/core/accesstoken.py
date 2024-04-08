@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from app.core.database import database
+from app.core.mongo_db import database
 
 import jwt
 

@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Form
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from app.core.database import database
+from app.core.mongo_db import database
 import random
 
 router = APIRouter()
