@@ -19,6 +19,19 @@ async def saveFile(save_path, data):
         buffer.write(data)
 
 
+async def read_file_content(file_path):
+    try:
+        with open(file_path, "rb") as file:
+            file_content = file.read()
+            return file_content
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+
 async def download_file(download_code):
     download_url = f"http://localhost:8000/drive/download-file/{download_code}"
     async with aiohttp.ClientSession() as session:
@@ -52,26 +65,17 @@ async def handle_file(websocket):
     if "download_code" in message:
         await download_file(message["download_code"])
     else:
+        print(f"Received message: {message}")
         await handle_request(websocket, message)
-
-
-async def read_file_content(file_path):
-    try:
-        with open(file_path, "rb") as file:
-            file_content = file.read()
-            return file_content
-    except FileNotFoundError:
-        print(f"File not found: {file_path}")
-        return None
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
 
 
 async def handle_request(websocket, message):
     if message["action"] == "get_tree_structure":
+        print("Getting tree structure")
         tree_structure = await get_tree_structure()
+        print(tree_structure)
         await websocket.send(json.dumps(tree_structure))
+        print("Tree structure sent")
     elif message["action"] == "get_file":
         file_path = message["file_path"]
         file_content = await read_file_content(file_path)

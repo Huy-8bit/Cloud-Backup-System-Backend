@@ -102,8 +102,9 @@ async def request_directory_structure(device_id: str):
         raise HTTPException(status_code=404, detail="Device not connected")
     websocket = connection_info["websocket"]
     await websocket.send_text(json.dumps({"action": "get_tree_structure"}))
-    data = await websocket.receive_text()
-    return {"directory_structure": json.loads(data)}
+    # data = await websocket.receive_text()
+    # return {"directory_structure": json.loads(data)}
+    return {"message": "Request sent"}
 
 
 @router.post("/send-file/{device_id}")
