@@ -18,14 +18,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# redis_client = redis.Redis(host="redis", port=6379, db=0)
-
-
-listening_thread_active = True
 
 redis_client = get_redis_client()
 listening_thread_active = True
-
 stop_listening_event = Event()
 
 
