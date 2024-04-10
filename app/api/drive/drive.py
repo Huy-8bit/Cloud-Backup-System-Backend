@@ -23,7 +23,7 @@ from ...core.os_support import (
     saveFile,
 )
 import datetime
-from app.core.redis_db import send_new_notification, get_redis_client
+from app.core.redis_db import get_data, get_redis_client, set_data
 
 router = APIRouter()
 
@@ -77,17 +77,15 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            print(f"Message received: {data}")
             client = await get_redis_client()
             action = json.loads(data).get("action")
-            # remove the action key from the data
             data = clean_data(json.loads(data), ["action"])
-            await send_new_notification(client, action, data)
-            print(f"Message received: {data}")
+            await set_data(client, f"{device_id}", data)
 
     except Exception as e:
         print(f"Error: {e}")
     finally:
+
         del active_connections[device_id]
 
 
@@ -102,16 +100,6 @@ async def get_active_connections():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/request-file-from-client/{device_id}")
-async def request_file_from_client(device_id: str, file_path: str):
-    connection_info = active_connections.get(device_id)
-    if not connection_info:
-        raise HTTPException(status_code=404, detail="Device not connected")
-    websocket = connection_info["websocket"]
-    await websocket.send_text(json.dumps({"action": "get_file"}))
-    return {"message": "File request initiated"}
-
-
 @router.get("/request-directory-structure/{device_id}")
 async def request_directory_structure(device_id: str):
     connection_info = active_connections.get(device_id)
@@ -119,12 +107,59 @@ async def request_directory_structure(device_id: str):
         raise HTTPException(status_code=404, detail="Device not connected")
     websocket = connection_info["websocket"]
     await websocket.send_text(json.dumps({"action": "get_tree_structure"}))
-    return {"message": "Directory structure request initiated"}
+    try:
+        client = await get_redis_client()
+        data = await get_data(client, f"{device_id}")
+        if data:
+            response = data["data"]
+            return json.loads(response)
+    except Exception as e:
+        print(f"Error: {e}")
+
+
+@router.post("/create-folder/{device_id}")
+async def create_folder(
+    device_id: str, folder_path: str, user=Depends(get_current_active_user)
+):
+    connection_info = active_connections.get(device_id)
+    if not connection_info:
+        raise HTTPException(status_code=404, detail="Device not connected")
+    await verify_user_ownership(user, device_id)
+    websocket = connection_info["websocket"]
+    await websocket.send_text(
+        json.dumps({"action": "create_folder", "folder_path": folder_path})
+    )
+    return {"message": "Folder creation initiated"}
+
+
+@router.get("/get-files/{device_id}")
+async def get_files(
+    device_id: str, file_path: str, user=Depends(get_current_active_user)
+):
+    connection_info = active_connections.get(device_id)
+    if not connection_info:
+        raise HTTPException(status_code=404, detail="Device not connected")
+    await verify_user_ownership(user, device_id)
+    websocket = connection_info["websocket"]
+    await websocket.send_text(
+        json.dumps({"action": "get_files", "file_path": file_path})
+    )
+    try:
+        client = await get_redis_client()
+        data = await get_data(client, f"{device_id}")
+        if data:
+            response = data["data"]
+            return json.loads(response)
+    except Exception as e:
+        print(f"Error: {e}")
 
 
 @router.post("/send-file/{device_id}")
 async def send_file(
-    device_id: str, file: UploadFile = File(...), user=Depends(get_current_active_user)
+    device_id: str,
+    file_path: str = Form(...),
+    file: UploadFile = File(...),
+    user=Depends(get_current_active_user),
 ):
     connection_info = active_connections.get(device_id)
     if not connection_info:
@@ -147,12 +182,17 @@ async def send_file(
             "file_name": file_name,
             "hash_name": new_file_name,
             "file_path": save_path,
+            "client_path": file_path,
             "upload_time": timestamp,
         }
     )
 
     websocket = connection_info["websocket"]
-    await websocket.send_text(json.dumps({"download_code": hash_code}))
+    await websocket.send_text(
+        json.dumps(
+            {"action": "send_files", "download_code": hash_code, "file_path": file_path}
+        )
+    )
 
     return {"message": "File processing initiated", "download_code": hash_code}
 
@@ -173,7 +213,10 @@ async def download_file(
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found on server")
 
-    headers = {"Content-Disposition": f'attachment; filename="{file_name}"'}
+    headers = {
+        "Content-Disposition": f'attachment; filename="{file_name}"',
+        "file_path": f"{file_path}",
+    }
 
     return FileResponse(file_path, headers=headers)
 

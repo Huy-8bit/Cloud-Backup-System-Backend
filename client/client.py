@@ -39,7 +39,7 @@ async def read_file_content(file_path):
         return None
 
 
-async def download_file(download_code):
+async def download_file(download_code, file_path):
     download_url = f"http://localhost:8000/drive/download-file/{download_code}"
     async with aiohttp.ClientSession() as session:
         async with session.get(download_url) as response:
@@ -57,7 +57,8 @@ async def download_file(download_code):
                 else:
                     filename = f"{download_code}.bin"
 
-                save_path = os.path.join("./data", filename)
+                file_path = "./data/" + file_path
+                save_path = os.path.join(file_path, filename)
                 print(f"Downloading file to: {save_path}")
                 file_data = await response.read()
                 await saveFile(save_path, file_data)
@@ -66,18 +67,26 @@ async def download_file(download_code):
                 print("Failed to download file.")
 
 
-async def handle_file(websocket):
+async def create_folder(folder_path):
+    folder_path = "./data/" + folder_path
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
+    response = {
+        "notification": "Folder created successfully",
+        "folder_path": folder_path,
+    }
+    return response
+
+
+async def handle_connect(websocket):
     try:
         message = await websocket.recv()
         print(f"Raw message received: {message}")
         if message:
             try:
                 data = json.loads(message)
-                if "download_code" in data:
-                    await download_file(data["download_code"])
-                else:
-                    print(f"Received message: {data}")
-                    await handle_request(websocket, data["action"])
+                await handle_request(websocket, data)
             except json.JSONDecodeError as e:
                 print(
                     f"JSONDecodeError occurred while decoding message: {message}, error: {e}"
@@ -88,14 +97,19 @@ async def handle_file(websocket):
         print(f"An unexpected error occurred: {e}")
 
 
-async def handle_request(websocket, action):
-    if action == "get_tree_structure":
+async def handle_request(websocket, data):
+
+    if data["action"] == "send_files":
+        download_code = data["download_code"]
+        file_path = data["file_path"]
+        await download_file(download_code, file_path)
+
+    elif data["action"] == "get_tree_structure":
         print("Sending directory structure")
         tree_structure = directory_tree_to_json("./data")
         try:
             response = {
-                "DEVICE_ID": id,
-                "action": "send_tree_structure",
+                "data": "send_tree_structure",
                 "data": tree_structure,
             }
             response = json.dumps(response)
@@ -103,6 +117,15 @@ async def handle_request(websocket, action):
         except Exception as e:
             print(f"An error occurred: {e}")
         print("Directory structure sent")
+
+    elif data["action"] == "create_folder":
+        folder_path = data["folder_path"]
+        response = await create_folder(folder_path)
+        response = json.dumps(response)
+        await websocket.send(response)
+        print("Folder created successfully")
+    else:
+        print("Invalid action")
 
 
 async def connect_and_listen():
@@ -124,7 +147,7 @@ async def connect_and_listen():
 
     async with websockets.connect(uri, extra_headers=headers) as websocket:
         while True:
-            await handle_file(websocket)
+            await handle_connect(websocket)
 
 
 asyncio.get_event_loop().run_until_complete(connect_and_listen())

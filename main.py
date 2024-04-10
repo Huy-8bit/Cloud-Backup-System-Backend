@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.mongo_db import database
 import threading
 from threading import Event
-from app.core.redis_db import get_redis_client, listen_for_messages
+from app.core.redis_db import get_redis_client, get_data, set_data
 
 
 app = FastAPI()
@@ -17,26 +17,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-redis_client = get_redis_client()
-listening_thread_active = True
-stop_listening_event = Event()
-
-
-@app.on_event("startup")
-async def startup_event():
-    global listener_thread
-    listener_thread = threading.Thread(
-        target=listen_for_messages, args=(redis_client, stop_listening_event)
-    )
-    listener_thread.start()
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    stop_listening_event.set()
-    listener_thread.join()
 
 
 app.include_router(register.router, prefix="/auth", tags=["auth"])
@@ -54,12 +34,14 @@ async def healthCheck():
     mongoDb = False
     redisDb = False
     try:
-        # add key value to redis
-        redis_client.set("healthCheck", "redis")
-        # get key value from redis
-        checkRedis = redis_client.get("healthCheck")
+        # check if redisDb is working by setting and getting a key
+        client = await get_redis_client()
+        await set_data(client, "test", "test")
+        checkRedis = await get_data(client, "test")
         if checkRedis:
             redisDb = True
+            # delete the key
+            client.delete("test")
     except Exception as e:
         print(e)
 
