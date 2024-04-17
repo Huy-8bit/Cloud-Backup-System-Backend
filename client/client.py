@@ -5,7 +5,7 @@ import json
 import aiohttp
 from urllib.parse import unquote
 from services import directory_tree_to_json
-
+import base64
 import re
 
 
@@ -27,6 +27,8 @@ async def get_tree_structure():
 
 
 async def read_file_content(file_path):
+
+    file_path = "./data" + file_path
     try:
         with open(file_path, "rb") as file:
             file_content = file.read()
@@ -97,6 +99,40 @@ async def handle_connect(websocket):
         print(f"An unexpected error occurred: {e}")
 
 
+async def post_file_to_server(device_id, file_path):
+
+    full_path = "./data" + file_path
+    print(f"Sending file: {full_path}")
+    try:
+        with open(full_path, "rb") as file:
+            file_content = file.read()
+            file_name = os.path.basename(file_path)
+            url = f"http://localhost:8000/drive/send_files_from_device/{device_id}"
+
+            async with aiohttp.ClientSession() as session:
+                files = {"file": (file_name, file_content)}
+                data = aiohttp.FormData()
+                data.add_field(
+                    "file",
+                    file_content,
+                    filename=file_name,
+                    content_type="application/octet-stream",
+                )
+                data.add_field("file_path", file_path)
+
+                async with session.post(url, data=data) as response:
+                    if response.status == 200:
+                        print("File was successfully sent to the server.")
+                        return await response.json()
+                    else:
+                        print("Failed to send file to the server.")
+                        return {"error": "Failed to send file"}
+    except FileNotFoundError:
+        print(f"File not found: {full_path}")
+    except Exception as e:
+        print(f"An error occurred while sending the file: {e}")
+
+
 async def handle_request(websocket, data):
 
     if data["action"] == "send_files":
@@ -124,6 +160,14 @@ async def handle_request(websocket, data):
         response = json.dumps(response)
         await websocket.send(response)
         print("Folder created successfully")
+
+    elif data["action"] == "get_files":
+        file_path = data["file_path"]
+        response = await post_file_to_server(id, file_path)
+        response = json.dumps(response)
+        await websocket.send(response)
+        print("File sent successfully")
+
     else:
         print("Invalid action")
 
