@@ -9,9 +9,6 @@ import base64
 import re
 
 
-id = ""
-
-
 def ensure_data_directory():
     if not os.path.exists("./data"):
         os.makedirs("./data")
@@ -42,7 +39,7 @@ async def read_file_content(file_path):
 
 
 async def download_file(download_code, file_path):
-    download_url = f"http://localhost:8000/drive/download-file/{download_code}"
+    download_url = f"http://54.254.58.42:8000/drive/download-file/{download_code}"
     async with aiohttp.ClientSession() as session:
         async with session.get(download_url) as response:
             print(f"Response status: {response.status}")
@@ -81,14 +78,13 @@ async def create_folder(folder_path):
     return response
 
 
-async def handle_connect(websocket):
+async def handle_connect(device_id, websocket):
     try:
         message = await websocket.recv()
-        print(f"Raw message received: {message}")
         if message:
             try:
                 data = json.loads(message)
-                await handle_request(websocket, data)
+                await handle_request(device_id, websocket, data)
             except json.JSONDecodeError as e:
                 print(
                     f"JSONDecodeError occurred while decoding message: {message}, error: {e}"
@@ -100,14 +96,15 @@ async def handle_connect(websocket):
 
 
 async def post_file_to_server(device_id, file_path):
-
+    print(f"Sending file: {file_path}")
+    print(f"Device ID: {device_id}")
     full_path = "./data" + file_path
     print(f"Sending file: {full_path}")
     try:
         with open(full_path, "rb") as file:
             file_content = file.read()
             file_name = os.path.basename(file_path)
-            url = f"http://localhost:8000/drive/send_files_from_device/{device_id}"
+            url = f"http://54.254.58.42:8000/drive/send_files_from_device/{device_id}"
 
             async with aiohttp.ClientSession() as session:
                 files = {"file": (file_name, file_content)}
@@ -133,7 +130,7 @@ async def post_file_to_server(device_id, file_path):
         print(f"An error occurred while sending the file: {e}")
 
 
-async def handle_request(websocket, data):
+async def handle_request(device_id, websocket, data):
 
     if data["action"] == "send_files":
         download_code = data["download_code"]
@@ -146,30 +143,62 @@ async def handle_request(websocket, data):
         try:
             response = {
                 "data": "send_tree_structure",
+                "action": "send_tree_structure",
                 "data": tree_structure,
             }
             response = json.dumps(response)
             await websocket.send(response)
         except Exception as e:
             print(f"An error occurred: {e}")
+
         print("Directory structure sent")
 
     elif data["action"] == "create_folder":
-        folder_path = data["folder_path"]
-        response = await create_folder(folder_path)
-        response = json.dumps(response)
-        await websocket.send(response)
-        print("Folder created successfully")
+        try:
+            folder_path = data["folder_path"]
+            response = await create_folder(folder_path)
+            response = json.dumps(response)
+            await websocket.send(response)
+            print("Folder created successfully")
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
     elif data["action"] == "get_files":
         file_path = data["file_path"]
-        response = await post_file_to_server(id, file_path)
-        response = json.dumps(response)
+        response = await post_file_to_server(device_id, file_path)
+        response = json.dumps(
+            {
+                "action": "get_files",
+                "device_id": device_id,
+                "file_path": file_path,
+                "download_code": response["download_code"],
+            }
+        )
         await websocket.send(response)
         print("File sent successfully")
 
     else:
         print("Invalid action")
+
+
+async def request_directory_structure(device_id):
+    try:
+
+        url = f"http://54.254.58.42:8000/drive/request-directory-structure/{device_id}"
+
+        async with aiohttp.ClientSession() as session:
+
+            async with session.get(
+                url,
+            ) as response:
+                if response.status == 200:
+                    print("Request successful")
+                    return await response.json()
+                else:
+                    print("Request failed")
+                    return {"error": "Failed to get directory structure"}
+    except Exception as e:
+        print(f"An error occurred while sending the file: {e}")
 
 
 async def connect_and_listen():
@@ -183,15 +212,18 @@ async def connect_and_listen():
     else:
         with open(id_file_path, "r") as f:
             device_id = f.read().strip()
-
-    id = device_id
+        print(f"Device ID: {device_id}")
 
     headers = {"DEVICE_ID": device_id}
-    uri = "ws://localhost:8000/drive/ws"
+    uri = "ws://54.254.58.42:8000/drive/ws"
+
+    print(f"Connecting to: {uri}")
 
     async with websockets.connect(uri, extra_headers=headers) as websocket:
+        await request_directory_structure(device_id)
+        print("Connected to server...")
         while True:
-            await handle_connect(websocket)
+            await handle_connect(device_id, websocket)
 
 
 asyncio.get_event_loop().run_until_complete(connect_and_listen())
