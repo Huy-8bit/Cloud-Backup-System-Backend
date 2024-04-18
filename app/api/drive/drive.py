@@ -25,6 +25,7 @@ from ...core.os_support import (
 import datetime
 from app.core.redis_db import get_data, get_redis_client, set_data
 import time
+from fastapi import BackgroundTasks
 
 router = APIRouter()
 
@@ -66,8 +67,17 @@ async def verify_user_ownership(user: dict, device_id: str):
     return True
 
 
+async def get_data_from_response(field, data):
+    try:
+        return data[field]
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    client = await get_redis_client()
     await websocket.accept()
     device_id = websocket.headers.get("device_id")
     if not device_id:
@@ -78,10 +88,13 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            client = await get_redis_client()
-            action = json.loads(data).get("action")
-            data = clean_data(json.loads(data), ["action"])
-            await set_data(client, f"{device_id}", data)
+            action = await get_data_from_response("action", json.loads(data))
+            print(f"Action: {action}")
+            if action != "get_files":
+                data = clean_data(json.loads(data), ["action"])
+                await set_data(client, f"{device_id}", data)
+            else:
+                await file_collection.insert_one(json.loads(data))
 
     except Exception as e:
         print(f"Error: {e}")
@@ -108,10 +121,10 @@ async def request_directory_structure(device_id: str):
         raise HTTPException(status_code=404, detail="Device not connected")
     websocket = connection_info["websocket"]
     await websocket.send_text(json.dumps({"action": "get_tree_structure"}))
+    client = await get_redis_client()
     try:
-        time.sleep(0.2)
-        client = await get_redis_client()
         data = await get_data(client, f"{device_id}")
+        client.close()
         if data:
             response = data["data"]
             return json.loads(response)
@@ -140,6 +153,7 @@ async def send_files_from_device(
     file_path: str = Form(...),
     file: UploadFile = File(...),
 ):
+    print("send_files_from_device")
     file_content = await file.read()
     file_name = file.filename
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
@@ -157,6 +171,7 @@ async def send_files_from_device(
             "hash_name": new_file_name,
             "file_path": save_path,
             "client_path": file_path,
+            "download_code": hash_code,
             "upload_time": timestamp,
         }
     )
@@ -168,7 +183,6 @@ async def send_files_from_device(
 async def get_files(
     device_id: str,
     file_path: str = Form(...),
-    file: UploadFile = File(...),
     user=Depends(get_current_active_user),
 ):
     print("get_files")
@@ -177,23 +191,36 @@ async def get_files(
         raise HTTPException(status_code=404, detail="Device not connected")
     await verify_user_ownership(user, device_id)
     websocket = connection_info["websocket"]
+    print(f"File path: {file_path}")
+    count = 0
+    try:
+        file_info = await file_collection.find_one(
+            {"device_id": device_id, "file_path": file_path}
+        )
+        print(f"File info: {file_info}")
+        if file_info:
+            return clean_data(file_info, ["_id", "action", "device_id", "file_path"])
+    except Exception as e:
+        print(f"Error: {e}")
+
     await websocket.send_text(
         json.dumps({"action": "get_files", "file_path": file_path})
     )
-
     count = 0
-    while count < 10:
-        count += 1
-        client = await get_redis_client()
-        data = await get_data(client, f"{device_id}")
-        if json.loads(data)["action"] == "get_files":
-            # get files from server
-            return FileResponse(
-                path="data",
-                filename=json.loads(data)["hash_name"],
-                media_type="application/octet-stream",
+    try:
+        while count < 10:
+            # check database for file
+            time.sleep(0.2)
+            file_info = await file_collection.find_one(
+                {"device_id": device_id, "file_path": file_path}
             )
-        time.sleep(1)
+            if file_info:
+                return clean_data(
+                    file_info, ["_id", "action", "device_id", "file_path"]
+                )
+            count += 1
+    except Exception as e:
+        print(f"Error: {e}")
 
     return {"message": "File not found"}
 
@@ -205,6 +232,7 @@ async def send_file(
     file: UploadFile = File(...),
     user=Depends(get_current_active_user),
 ):
+    print("send_file")
     connection_info = active_connections.get(device_id)
     if not connection_info:
         raise HTTPException(status_code=404, detail="Device not connected")
@@ -227,6 +255,7 @@ async def send_file(
             "hash_name": new_file_name,
             "file_path": save_path,
             "client_path": file_path,
+            "download_code": hash_code,
             "upload_time": timestamp,
         }
     )
@@ -242,10 +271,7 @@ async def send_file(
 
 
 @router.get("/download-file/{file_code}")
-async def download_file(
-    file_code: str = Path(..., title="The file code"),
-):
-
+async def download_file(file_code: str, background_tasks: BackgroundTasks):
     file_info = await database["filesManager"].find_one(
         {"hash_name": {"$regex": f"^{file_code}"}}
     )
@@ -257,12 +283,21 @@ async def download_file(
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found on server")
 
-    headers = {
-        "Content-Disposition": f'attachment; filename="{file_name}"',
-        "file_path": f"{file_path}",
-    }
+    def remove_file(path):
+        os.remove(path)
+        # remove database entry
 
-    return FileResponse(file_path, headers=headers)
+    response = FileResponse(
+        file_path,
+        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+    )
+
+    await database["filesManager"].delete_one({"file_path": file_path})
+    await database["filesManager"].delete_one({"download_code": file_code})
+
+    background_tasks.add_task(remove_file, file_path)
+
+    return response
 
 
 @router.post("/setDevice")
@@ -274,7 +309,7 @@ async def setDevice(
         raise HTTPException(status_code=404, detail="User not found")
 
     device = await device_collection.find_one({"user_id": user_id["id"]})
-    device_id = hashlib.sha256(device_name.encode()).hexdigest()
+    device_id = hashlib.sha256((device_name + user_id["id"]).encode()).hexdigest()
 
     if device:
         await device_collection.update_one(
@@ -294,15 +329,24 @@ async def setDevice(
 
 
 @router.get("/getClientExecutable")
-async def getClientExecutable():
+async def getClientExecutable(
+    os_device: str = Form(...),
+):
+    filename_os = ""
+    if os_device == "windows":
+        filename_os = "client-windows.zip"
+        client_executable_path = os.path.join("client", "dist", "client-windows.zip")
+    elif os_device == "macos":
+        filename_os = "client-mac.zip"
+        client_executable_path = os.path.join("client", "dist", "client-macos.zip")
 
-    client_executable_path = os.path.join("client", "dist", "client.zip")
+    # client_executable_path = os.path.join("client", "dist", "client.zip")
 
     if not os.path.exists(client_executable_path):
         raise HTTPException(status_code=404, detail="Client executable not found")
 
     return FileResponse(
         path=client_executable_path,
-        filename="client.zip",
+        filename=filename_os,
         media_type="application/zip",
     )
