@@ -140,8 +140,6 @@ async def send_files_from_device(
     file_path: str = Form(...),
     file: UploadFile = File(...),
 ):
-    # save file path and file path server (save file is temp folder) to redis
-
     file_content = await file.read()
     file_name = file.filename
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
@@ -153,24 +151,24 @@ async def send_files_from_device(
     ensure_path_exists("data")
     await saveFile(save_path, file_content)
 
-    # save to redis
-    client = await get_redis_client()
-    await set_data(
-        client,
-        f"{device_id}",
+    await file_collection.insert_one(
         {
-            "action": "send_files",
+            "file_name": file_name,
             "hash_name": new_file_name,
-            "file_path": file_path,
-        },
+            "file_path": save_path,
+            "client_path": file_path,
+            "upload_time": timestamp,
+        }
     )
-    return {"message": "File processing initiated"}
+
+    return {"message": "File processing initiated", "download_code": hash_code}
 
 
 @router.get("/get-files/{device_id}")
 async def get_files(
     device_id: str,
     file_path: str = Form(...),
+    file: UploadFile = File(...),
     user=Depends(get_current_active_user),
 ):
     print("get_files")
