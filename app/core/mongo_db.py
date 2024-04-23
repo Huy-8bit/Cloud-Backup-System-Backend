@@ -4,7 +4,7 @@ from app.core.config import settings
 
 # MONGO_INITDB_ROOT_USERNAME = ""
 # MONGO_INITDB_ROOT_PASSWORD = ""
-MONGO_HOST = "13.212.87.149"
+MONGO_HOST = "localhost"
 MONGO_PORT = "27017"
 MONGO_DATABASE = "cloud_backup"
 
