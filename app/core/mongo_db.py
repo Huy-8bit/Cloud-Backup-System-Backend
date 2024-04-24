@@ -12,7 +12,7 @@ MONGO_DATABASE = "cloud_backup"
 
 DATABASE_URL = f"mongodb://{MONGO_HOST}:{MONGO_PORT}/{MONGO_DATABASE}"
 
-# DATABASE_URL = "mongodb://54.254.58.42:27017"
+# DATABASE_URL = "mongodb://13.215.161.193:27017"
 
 client = AsyncIOMotorClient(DATABASE_URL)
 
