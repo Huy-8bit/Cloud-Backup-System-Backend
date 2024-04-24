@@ -1,4 +1,5 @@
-FROM python:3.11
+
+FROM python:3.9
 
 WORKDIR /app
 
@@ -10,6 +11,12 @@ RUN /bin/bash -c "source virtualenv/bin/activate"
 
 RUN pip install -r requirements.txt
 
+
+RUN mkdir -p data/key data/encrypted_files
+
 COPY . .
 
-CMD ["python3.11", "client/client.py"]
+EXPOSE 8000
+
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
