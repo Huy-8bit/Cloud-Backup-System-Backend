@@ -179,7 +179,7 @@ async def send_files_from_device(
     return {"message": "File processing initiated", "download_code": hash_code}
 
 
-@router.get("/get-files/{device_id}")
+@router.post("/get-files/{device_id}")
 async def get_files(
     device_id: str,
     file_path: str = Form(...),
@@ -328,7 +328,7 @@ async def setDevice(
     return {"message": "Device set successfully", "device_id": device_id}
 
 
-@router.get("/getClientExecutable")
+@router.post("/getClientExecutable")
 async def getClientExecutable(
     os_device: str = Form(...),
 ):
