@@ -39,7 +39,7 @@ async def read_file_content(file_path):
 
 
 async def download_file(download_code, file_path):
-    download_url = f"http://13.215.161.193/drive/download-file/{download_code}"
+    download_url = f"http://18.141.58.127/drive/download-file/{download_code}"
     async with aiohttp.ClientSession() as session:
         async with session.get(download_url) as response:
             print(f"Response status: {response.status}")
@@ -104,7 +104,7 @@ async def post_file_to_server(device_id, file_path):
         with open(full_path, "rb") as file:
             file_content = file.read()
             file_name = os.path.basename(file_path)
-            url = f"http://13.215.161.193/drive/send_files_from_device/{device_id}"
+            url = f"http://18.141.58.127/drive/send_files_from_device/{device_id}"
 
             async with aiohttp.ClientSession() as session:
                 files = {"file": (file_name, file_content)}
@@ -184,7 +184,7 @@ async def handle_request(device_id, websocket, data):
 async def request_directory_structure(device_id):
     try:
 
-        url = f"http://13.215.161.193/drive/request-directory-structure/{device_id}"
+        url = f"http://18.141.58.127/drive/request-directory-structure/{device_id}"
 
         async with aiohttp.ClientSession() as session:
 
@@ -215,7 +215,7 @@ async def connect_and_listen():
         print(f"Device ID: {device_id}")
 
     headers = {"DEVICE_ID": device_id}
-    uri = "ws://13.215.161.193/drive/ws"
+    uri = "ws://18.141.58.127/drive/ws"
 
     print(f"Connecting to: {uri}")
 

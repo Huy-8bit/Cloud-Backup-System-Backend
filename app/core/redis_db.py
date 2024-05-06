@@ -3,7 +3,7 @@ import json
 
 
 async def get_redis_client():
-    return redis.Redis(host="13.215.161.193", port=6379, db=0)
+    return redis.Redis(host="18.141.58.127", port=6379, db=0)
 
 
 async def get_data(client, key):
